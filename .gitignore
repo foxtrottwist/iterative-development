@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Skill packages
+*.skill
+
+# Editor
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Distribution
+dist/
