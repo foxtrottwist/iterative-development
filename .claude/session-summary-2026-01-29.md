@@ -117,6 +117,30 @@ Task T{N} Start
 - Reinitialized as `iterative-development`
 - Pushed to `github.com:foxtrottwist/iterative-development`
 
+---
+
+## Applied to Burrow (iterative-work skill)
+
+Same verification hierarchy applied to `/Users/lawhorne/Repos/burrow`:
+
+### Files Created
+- `references/verification.md` — Verification hierarchy adapted for knowledge work
+- `agents/verify.md` — Quality review agent for phases
+
+### Files Modified
+- `.github/workflows/release.yml` — Excluded README.md, fixed skill name from "burrow" to "iterative-work"
+- `SKILL.md` — Added phase loop diagram, completion gates section, verify.md reference
+- `references/state.md` — New statuses (confirming, verifying), fixed directory name
+- `references/prompts.md` — Added confirmation pass documentation, updated signals
+- All agent files — Standardized `.burrow/` → `.iterative-work/`
+
+### Key Adaptations for Knowledge Work
+- "Task" → "Phase" (R1, D1, A1, P1 instead of T1, T2)
+- "Code review" → "Quality review"
+- Focus on depth, sources, coherence rather than build/tests
+
+---
+
 ## Key Quotes from Discussion
 
 > "A task is assigned to a sub agent, regardless of how many iterations that would naturally take there is always plus one more iteration that should try to complete the task again. Each iteration really should be a fresh start."
