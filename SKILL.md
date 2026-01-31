@@ -1,17 +1,17 @@
 ---
-name: iterative-work
-description: Knowledge work orchestration using stateless iteration. Handles research synthesis, document production, analysis, and planning workflows. Decomposes into phases, runs each through fresh-context iterations until completion. Supports resumption after interruption.
+name: iterative-development
+description: Development task orchestration using stateless iteration. Decomposes features into atomic tasks, runs each through fresh-context iterations until completion, persists state in files. Handles implementation, review, and fix cycles. Supports resuming at any phase after interruption.
 ---
 
-# Iterative Work
+# Iterative Development
 
-Knowledge work orchestration using fresh-context iteration loops. Each phase runs as multiple stateless passes—context resets every iteration, state persists in files.
+Development task orchestration using fresh-context iteration loops. Each task runs as multiple stateless iterations—context resets every pass, state persists in files.
 
 ## Core Pattern
 
 ```
 Fresh context EVERY iteration.
-State persists in files.
+State persists in files + git.
 Progress file = notes to your next iteration.
 ```
 
@@ -20,246 +20,472 @@ This builds on the Ralph Wiggum Technique (Geoffrey Huntley): instead of growing
 ## Workflow
 
 ```
-RESUME?  →  DISCOVER  →  PLAN  →  EXECUTE  →  VERIFY  →  DELIVER
-(check      (clarify     (phases)  (iterate)  (review)  (package)
- state)      scope)
+RESUME?   →   INTERVIEW   →   PLAN   →   LOOP   →   CHECK   →   WRAP
+(check        (discover)     (tasks)   (iterate)  (review)   (commit)
+ state)
 ```
 
 ## Phase 0: Resume Check
 
-Every invocation, check for existing work:
+**Every invocation**, check for existing work:
 
 ```bash
-ls .iterative-work/ 2>/dev/null
+ls .claude/iterative-dev/ 2>/dev/null
 ```
 
 **If state exists**, read `state.json` and present:
 ```
-Found "{task}" at phase {N}:
-- Completed: R1, R2
-- Current: R3 (iteration 2)
-- Remaining: R4
+Found "{feature}" at phase {N}:
+- Completed: T1, T2, T3
+- Current: T4 (iteration 3 of max 10)
+- Remaining: T5, T6
 
 Resume, start fresh, or check status?
 ```
 
-**If no state**, proceed to Discover.
+**If no state**, proceed to Interview.
 
-## Phase 1: Discover
+## Phase 1: Interview
 
-Use the **AskUserQuestion tool** to gather requirements. This built-in tool presents clickable options.
+Use the **AskUserQuestion tool** to gather requirements. This built-in tool only works in main session—sub-agents cannot ask questions.
 
-**Core questions:**
-1. What outcome do you need? (research / document / analysis / plan)
-2. What does "done" look like?
-3. Any constraints (time, format, scope)?
+**Invoke AskUserQuestion** with structured questions:
 
-See [references/interview.md](references/interview.md) for question templates.
+```
+Use AskUserQuestion to clarify requirements:
+
+Question 1: "What are we building?"
+Options:
+- {inferred from prompt} (Recommended)
+- New feature
+- Bug fix  
+- Refactor
+- Other
+
+Question 2: "How will we know it's done?"
+Options (multiSelect: true):
+- All tests passing
+- Manual verification works
+- Specific behavior achieved
+- Code review approved
+
+Question 3: "Any constraints?"
+Options (multiSelect: true):
+- Backward compatibility required
+- Performance critical
+- Accessibility requirements
+- Platform specific
+- None
+
+Question 4: "Technical approach?"
+Options:
+- Follow existing patterns (Recommended)
+- Specific approach: [input]
+- Explore codebase first
+```
+
+**Tool behavior:**
+- User sees clickable options
+- 60-second timeout per question
+- User can always select "Other" for free text
+- Mark recommended option first with "(Recommended)"
+
+See [references/interview.md](references/interview.md) for additional question templates.
 
 **Output:**
-- Create `.iterative-work/{task-slug}/`
-- Write `brief.md` with requirements
+- Create `.claude/iterative-dev/{feature-slug}/`
+- Write `prd.md` with requirements
 - Write `state.json`: `{ "phase": "plan" }`
 
 ## Phase 2: Plan
 
-Decompose into phases based on domain. See [references/domains.md](references/domains.md) for templates.
+Decompose into atomic tasks. Each task will run as its own iteration loop.
 
-| Domain | Phases | Use When |
-|--------|--------|----------|
-| Research | R1→R2→R3→R4 | Synthesizing sources, literature review |
-| Writing | D1→D2→D3→D4 | Documents, reports, articles |
-| Analysis | A1→A2→A3→A4 | Data interpretation, recommendations |
-| Planning | P1→P2→P3→P4 | Decisions, strategy, project planning |
+**Sizing rule**: Tasks should be completable, but iterations handle complexity. Size for clarity, not minimalism.
 
-**Phase format:**
+| Size | Max Iterations | Characteristics |
+|------|----------------|-----------------|
+| Simple | 3-5 | Single file, clear pattern |
+| Medium | 5-10 | 2-3 files, some complexity |
+| Complex | 10-15 | Multiple files, new patterns |
+
+**Task format:**
 ```markdown
-- [ ] **R1**: {title}
+- [ ] **T1**: {title}
+  - Files: `{paths}`
   - Criteria: {measurable acceptance}
-  - Output: `{file_path}`
-  - Max iterations: {3-8}
+  - Completion: `<signal>T1_DONE</signal>`
+  - Max iterations: 5
+  - Depends: none
+  - Model: haiku | sonnet | opus
 ```
 
+**Model selection guide:**
+
+| Task Type | Model | Why |
+|-----------|-------|-----|
+| File operations, grep, simple edits | haiku | Mechanical work |
+| Standard implementation | sonnet | Balanced capability |
+| Code review, test generation | sonnet | Structured output |
+| Complex debugging, architecture | opus | Deep reasoning |
+
+See [references/tasks.md](references/tasks.md) for format details.
+
 **Output:**
-- Write `plan.md` with phase breakdown
-- Write `context.md` (brief summary)
-- Create empty `progress.md` and `guardrails.md`
-- Update `state.json`: `{ "phase": "execute", "current": "R1", "iteration": 0 }`
-- Present plan for approval
+- Write `tasks.md`
+- Write `context.md` (brief summary for sub-agents)
+- Create empty `guardrails.md`
+- Create empty `progress.md`
+- Update `state.json`: `{ "phase": "loop", "current": "T1", "iteration": 0 }`
+- Present plan for user approval
 
-## Phase 3: Execute (Iteration Loop)
+## Phase 3: Loop (Execute)
 
-Each phase runs as an iteration loop until criteria met or max iterations, then passes through verification gates.
+This is the core pattern. **Each task runs as its own loop of fresh-context iterations.**
+
+### Task Loop Structure
+
+For each task (respecting dependencies):
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  PHASE LOOP (R2)                                │
+│  TASK LOOP (T1)                                 │
 │                                                 │
 │  Iteration 1: Fresh agent → reads state → works │
 │       ↓                                         │
+│  Iteration 2: Fresh agent → reads progress → continues
+│       ↓                                         │
 │  Iteration N: Agent declares DONE               │
+│       ↓                                         │
+│  Programmatic checks (build, lint, tests)       │
 │       ↓                                         │
 │  Confirmation pass (N+1): Fresh agent, same task│
 │       ↓                                         │
-│  Verification agent: Quality review             │
+│  Verification agent: Code review                │
 │       ↓                                         │
-│  Phase complete                                 │
+│  Task complete                                  │
 └─────────────────────────────────────────────────┘
 ```
 
 See [references/verification.md](references/verification.md) for the complete verification hierarchy.
 
-### Per Iteration
+### Dispatch Fresh Sub-Agent (Each Iteration)
 
-1. Read `progress.md` for prior work
-2. Read `guardrails.md` for lessons learned
-3. Continue from "Remaining" items
-4. Make progress toward criteria
-5. Save checkpoint to outputs
-6. Append to `progress.md`:
+**Critical**: Each iteration spawns a completely fresh sub-agent. No memory of previous iterations except what's in files.
 
-```markdown
-## R1 - Iteration {I} - {timestamp}
-**Did:** {what accomplished}
-**Remaining:** {what's left, or "None"}
-**Blockers:** {issues, or "None"}
 ```
+Iteration {I} of {MAX} for T{N}: "{title}"
 
-7. If ALL criteria met: Add `**Signal:** R1_DONE`
-8. If blocked: Note blocker, may need user input
+Read these files first (your only memory):
+- .claude/iterative-dev/{slug}/progress.md
+- .claude/iterative-dev/{slug}/guardrails.md
+- .claude/iterative-dev/{slug}/context.md
 
-See [agents/](agents/) for domain-specific iteration guidance:
-- [agents/research.md](agents/research.md) — R1-R4 phases
-- [agents/draft.md](agents/draft.md) — D1-D4 phases
-- [agents/analyze.md](agents/analyze.md) — A1-A4 phases
-- [agents/plan.md](agents/plan.md) — P1-P4 phases
-- [agents/verify.md](agents/verify.md) — Phase-level quality review (after confirmation)
-- [agents/review.md](agents/review.md) — Task-level review (cross-phase integration)
+Task: {title}
+Files: {paths}
+Criteria: {acceptance}
 
-See [references/prompts.md](references/prompts.md) for iteration prompt templates.
+Your job this iteration:
+1. Read progress.md to see what previous iterations accomplished
+2. Continue from where they left off
+3. Work toward the criteria
+4. Commit any meaningful progress: "feat({slug}): {summary}"
+5. Update progress.md with what you did and what remains
+6. If criteria fully met, output: <signal>T{N}_DONE</signal>
+7. If blocked, output: <signal>BLOCKED:{reason}</signal>
+
+If not done and not blocked, just exit. Next iteration will continue.
+```
 
 ### Progress File is Critical
 
-The progress file bridges iterations:
+The progress file bridges context windows. Each iteration appends:
 
 ```markdown
-## R2 - Iteration 1 - 2026-01-16T10:00:00
-**Did:** Evaluated 4 of 12 sources, created evaluation template
-**Remaining:** 8 sources, synthesize scores
+## T1 - Iteration 1 - {timestamp}
+**Did:** Set up file structure, created User model skeleton
+**Remaining:** Add properties, implement Codable
 **Blockers:** None
+**Commit:** abc1234
 
-## R2 - Iteration 2 - 2026-01-16T10:15:00
-**Did:** Completed remaining evaluations
+## T1 - Iteration 2 - {timestamp}  
+**Did:** Added all properties, Codable conformance
+**Remaining:** SwiftData annotations
+**Blockers:** None
+**Commit:** def5678
+
+## T1 - Iteration 3 - {timestamp}
+**Did:** Added SwiftData annotations, all criteria met
 **Remaining:** None
-**Signal:** R2_DONE
+**Signal:** T1_DONE
+**Commit:** ghi9012
 ```
 
-Each iteration reads this to understand state, then appends.
+### Loop Control
 
-### Phase Completion Gates
+**Main session orchestrates** but does not carry task context:
 
-When an agent declares DONE, the phase passes through verification gates:
+```python
+# Pseudocode for main session
+for task in tasks:
+    iteration = 0
+    while iteration < task.max_iterations:
+        iteration += 1
+        update_state(task, iteration)
+        
+        # Dispatch fresh sub-agent
+        result = spawn_fresh_agent(task, iteration)
+        
+        if "DONE" in result:
+            mark_complete(task)
+            break
+        elif "BLOCKED" in result:
+            log_blocked(task, result)
+            break
+        # else: continue to next iteration
+    
+    if iteration >= task.max_iterations:
+        log_timeout(task)
+```
 
-1. **Confirmation pass (N+1)** — Fresh agent receives same phase prompt, attempts to complete it. If truly done, finds nothing to do. If incomplete, continues work.
-2. **Verification agent** — Quality review with adversarial mindset. See [agents/verify.md](agents/verify.md).
+### Fresh Context Discipline
 
-Only after all gates pass is the phase marked complete. This catches both incomplete work (confirmation) and flawed work (verification).
+**Include** in sub-agent prompt:
+- Task ID, title, criteria
+- Current iteration number and max
+- File paths to read (progress, guardrails, context)
+- File paths to modify
 
-## Phase 4: Verify (Task Review)
+**Exclude** from sub-agent prompt:
+- Full PRD content
+- Other task details
+- Previous iteration outputs
+- Conversation history
 
-Review completed work against original brief. Runs as iteration loop until PASS.
+**Let agents read files.** Don't paste content into prompts.
 
-See [agents/review.md](agents/review.md) for review process.
+### After Each Iteration
 
-**If issues found:**
-- List specific gaps
-- Run [agents/revise.md](agents/revise.md) iterations per issue
-- Re-verify
+1. Check for completion signal in output
+2. Update `state.json` with iteration count
+3. Verify progress.md was updated
+4. If DONE: proceed to task completion gates
+5. If BLOCKED: log reason, move to next unblocked task
+6. If max iterations: log timeout, report to user
 
-**If all checks pass:** Proceed to Deliver.
+### Task Completion Gates
 
-## Phase 5: Deliver
+When an agent declares DONE, the task passes through verification gates:
 
-1. Compile final outputs
-2. Present summary:
+1. **Programmatic checks** — Build and lint must pass
+2. **Test gate** — Generate tests for new code, run all tests. See [agents/test.md](agents/test.md).
+3. **Confirmation pass (N+1)** — Fresh agent receives same task prompt, attempts to complete it. If truly done, finds nothing to do. If incomplete, continues work.
+4. **Verification agent** — Code review with adversarial mindset. See [agents/verify.md](agents/verify.md).
+
+Only after all gates pass is the task marked complete. This catches incomplete work (confirmation), incorrect behavior (tests), and flawed code (verification).
+
+### Test Gate Details
+
+```
+Implementation DONE → Build passes? → Test agent
+                                        ├── Generate tests (if needed)
+                                        ├── Run all tests
+                                        ├── TESTS_PASS → Confirmation
+                                        └── TESTS_FAIL → Fix iteration → Re-test
+```
+
+**Test strategy by task type:**
+
+| Task Type | Test Approach |
+|-----------|---------------|
+| New feature | Unit + integration tests |
+| Bug fix | Regression test for the bug |
+| Refactor | Existing tests must pass |
+| API change | Contract tests |
+
+See [agents/test.md](agents/test.md) for full testing guidance.
+
+### Parallel Task Execution
+
+Tasks without dependencies can run concurrent loops:
+
+```
+Launch parallel task loops:
+
+T2 Loop: max 5 iterations [model: sonnet]
+T4 Loop: max 3 iterations [model: haiku]
+
+Each task runs its own iteration cycle independently.
+```
+
+## Phase 4: Check (Review)
+
+Review runs as its own iteration loop until PASS or max attempts:
+
+```
+Review iteration {I} for "{feature}".
+
+Read:
+- .claude/iterative-dev/{slug}/tasks.md
+- .claude/iterative-dev/{slug}/progress.md
+- .claude/iterative-dev/{slug}/guardrails.md
+
+Verify:
+1. Code builds without warnings
+2. Each task's acceptance criteria met
+3. Code follows project patterns
+4. Tests pass (if applicable)
+
+If all checks pass: <signal>REVIEW_PASS</signal>
+
+If issues found, list them:
+[error] {file}:{line} - {issue}
+[warning] {file}:{line} - {issue}
+
+Then output: <signal>REVIEW_FAIL</signal>
+```
+
+**On REVIEW_FAIL:**
+- Dispatch fix loop (fresh iterations) per issue
+- Re-run review loop
+- Repeat until PASS or max review cycles
+
+## Phase 5: Wrap (Commit)
+
+1. Squash commits if requested (or keep granular)
+2. Run final build/test verification
+3. Present summary:
    ```
-   Task: {name}
-   Phases: {N} completed
-   Total iterations: {sum}
-   Outputs: {file list}
+   Feature: {name}
+   Tasks: {N} completed
+   Total iterations: {sum across tasks}
+   Files: {list}
+   Commits: {count}
+   
+   Ready to push?
    ```
-3. Archive state to `.iterative-work/archive/{slug}/`
+4. Archive state to `.claude/iterative-dev/archive/{slug}/`
+5. Update `state.json`: `{ "phase": "complete" }`
 
 ## State Files
 
-All state lives in `.iterative-work/{task-slug}/`:
+All state lives in `.claude/iterative-dev/{feature-slug}/`:
 
 ```
-.iterative-work/
-├── {task-slug}/
-│   ├── state.json      # Phase, progress tracking
-│   ├── brief.md        # Requirements from discovery
-│   ├── plan.md         # Phase breakdown
-│   ├── context.md      # Brief summary
-│   ├── progress.md     # Iteration log (critical)
-│   ├── guardrails.md   # Accumulated lessons
-│   ├── sources/        # Research inputs
-│   └── outputs/        # Deliverables
-└── archive/            # Completed tasks
+.claude/iterative-dev/
+├── {feature-slug}/
+│   ├── state.json      # Phase, current task, iteration count
+│   ├── prd.md          # Requirements from interview
+│   ├── tasks.md        # Task breakdown with status
+│   ├── context.md      # Brief summary for sub-agents
+│   ├── progress.md     # Iteration log
+│   └── guardrails.md   # Accumulated lessons
+└── archive/            # Completed features
 ```
 
-See [references/state.md](references/state.md) for detailed schemas.
+### state.json Schema
+
+```json
+{
+  "feature": "user-authentication",
+  "slug": "user-auth",
+  "phase": "loop",
+  "current_task": "T3",
+  "current_iteration": 2,
+  "max_iteration": 10,
+  "tasks": {
+    "T1": { "status": "done", "iterations": 3 },
+    "T2": { "status": "done", "iterations": 5 },
+    "T3": { "status": "in_progress", "iterations": 2 },
+    "T4": { "status": "pending" },
+    "T5": { "status": "pending" }
+  },
+  "blocked": {}
+}
+```
+
+See [references/state.md](references/state.md) for full schemas.
 
 ## Guardrails
 
-Read `guardrails.md` before each iteration. Append when discovering issues:
+Sub-agents read `guardrails.md` before starting and append when they hit problems:
 
 ```markdown
-## {Pattern Name}
-- **Context:** {when this applies}
-- **Problem:** {what went wrong}
-- **Solution:** {how to avoid}
-- **Learned:** R{N} iteration {I}
+## Don't trust token claims
+- **When**: Implementing auth
+- **Do**: Always validate server-side
+- **Learned**: T3 iteration 2 - Security issue
+
+## Use DateFormatter.shared
+- **When**: Displaying dates
+- **Do**: Don't create inline formatters
+- **Learned**: T2 iteration 4 - Performance note
 ```
 
-Lessons accumulate across iterations and phases.
-
-## Iteration Limits
-
-| Phase Complexity | Max Iterations | Characteristics |
-|------------------|----------------|-----------------|
-| Simple | 3 | Clear criteria, single output |
-| Medium | 5 | Some judgment, multiple aspects |
-| Complex | 8 | Synthesis required, quality bar |
-
-Start conservative. Increase if phase times out without completion.
+Guardrails accumulate across iterations and tasks. Every fresh agent benefits from past lessons.
 
 ## Resuming
 
-After interruption:
+**After interruption** (network, timeout, new session):
 
-1. Detect existing `.iterative-work/{slug}/` state
-2. Read `state.json` for phase and iteration
-3. Read `progress.md` for what happened
-4. Resume at exact point
+1. Skill detects existing state
+2. Reads `state.json` for phase, task, and iteration
+3. Reads `progress.md` for what happened
+4. Resumes at exact iteration point
+
+```
+Found "user-auth" in loop phase:
+- Task: T3 "Create auth service"
+- Iteration: 2 of 10
+- Last progress: "Added login method, working on token refresh"
+
+Resume from iteration 3?
+```
+
+**Skip to phase:**
+```
+/iter-dev skip-to review
+```
+
+**Check status:**
+```
+/iter-dev status
+```
+
+## Sub-Agent Definitions
+
+Install these in `.claude/agents/` for model optimization:
+
+- `impl-haiku.md` — Simple implementations
+- `impl-sonnet.md` — Standard implementations
+- `impl-opus.md` — Complex implementations
+- `review.md` — Feature-level review (cross-task integration)
+- `verify.md` — Task-level verification (code review after confirmation)
+- `fix.md` — Issue fixes
+- `test.md` — Test generation
+
+See [agents/](agents/) directory for definitions.
+
+## Anti-Patterns
+
+- **Carrying context**: Passing previous iteration output into next prompt
+- **Giant tasks**: Let iterations handle complexity, but scope tasks reasonably
+- **Skipping progress updates**: Next iteration has no idea what happened
+- **Ignoring guardrails**: Repeat past mistakes across iterations
+- **Too few iterations**: Complex tasks need room to converge
+- **Too many iterations**: Thrashing without progress wastes resources
 
 ## Quick Reference
 
 | Command | Action |
 |---------|--------|
-| `/iter-work {description}` | Start new task |
-| `/iter-work resume` | Continue from exact point |
-| `/iter-work status` | Check progress |
-
-## Anti-Patterns
-
-- **Skipping progress updates** — Next iteration has no context
-- **Ignoring guardrails** — Repeat past mistakes
-- **Giant phases** — Let iterations handle complexity, but scope reasonably
-- **Too few iterations** — Complex work needs room to converge
+| `/iter-dev {description}` | Start new feature |
+| `/iter-dev resume` | Continue from exact point |
+| `/iter-dev status` | Check progress with iteration counts |
+| `/iter-dev skip-to {phase}` | Jump to phase |
 
 ## Attribution
 
 This skill builds on the Ralph Wiggum Technique (Geoffrey Huntley): a loop that repeatedly invokes an agent with a prompt file, allowing iterative refinement until completion. Instead of growing conversation history until context degrades, reset the context window every iteration. State lives in files. Each fresh agent reads those files to pick up where the last one left off.
 
-Anthropic's documentation on long-running agents and sub-agent coordination informed the architecture.
+Anthropic's documentation on long-running agents and sub-agent coordination informed the dispatch mechanics.
